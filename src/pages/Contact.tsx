@@ -1,5 +1,5 @@
 import { motion, useScroll, useTransform } from 'motion/react';
-import { Instagram, Linkedin, Mail, MapPin, ArrowRight, Sparkles, Send } from 'lucide-react';
+import { Instagram, Linkedin, Mail, MapPin, ArrowRight, Sparkles, Send, AlertCircle, Loader2 } from 'lucide-react';
 import { useState, ChangeEvent, FormEvent } from 'react';
 
 export default function Contact() {
@@ -10,25 +10,63 @@ export default function Contact() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate form submission
-    setTimeout(() => {
+    setErrorMessage('');
+
+    const accessKey = 
+      import.meta.env.VITE_WEB3FORMS_ACCESS_KEY || 
+      (typeof process !== 'undefined' && process.env ? process.env.VITE_WEB3FORMS_ACCESS_KEY : '');
+
+    if (!accessKey) {
       setIsSubmitting(false);
-      setIsSubmitted(true);
-      setFormData({ name: '', email: '', message: '' });
-      
-      // Reset success message after 5 seconds
-      setTimeout(() => setIsSubmitted(false), 5000);
-    }, 1500);
+      setErrorMessage(
+        'Web3Forms access key is not set. Please add VITE_WEB3FORMS_ACCESS_KEY to your .env file or contact varunpironiya@gmail.com directly.'
+      );
+      return;
+    }
+
+    try {
+      const response = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          access_key: accessKey,
+          name: formData.name,
+          email: formData.email,
+          message: formData.message,
+          subject: `Portfolio Inquiry from ${formData.name}`,
+          from_name: `${formData.name} via Portfolio`,
+          botcheck: ''
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setIsSubmitting(false);
+        setIsSubmitted(true);
+        setFormData({ name: '', email: '', message: '' });
+      } else {
+        setIsSubmitting(false);
+        setErrorMessage(data.message || 'Something went wrong while sending your message. Please try again or email directly.');
+      }
+    } catch (err) {
+      console.error('Error sending contact form:', err);
+      setIsSubmitting(false);
+      setErrorMessage('Network connection error. Please try again or email directly to varunpironiya@gmail.com');
+    }
   };
 
   return (
@@ -174,11 +212,30 @@ export default function Contact() {
                   <Send className="w-10 h-10 text-green-600 ml-1" />
                 </div>
                 <h4 className="text-4xl font-bold mb-4 tracking-tight">Message Sent!</h4>
-                <p className="text-xl text-green-700/80 max-w-md">Thank you for reaching out. I'll review your details and get back to you within 24 hours.</p>
+                <p className="text-xl text-green-700/80 max-w-md mb-8">
+                  Thank you for reaching out. Your inquiry has been forwarded directly to my Gmail, and I'll get back to you within 24 hours.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsSubmitted(false)}
+                  className="py-3 px-8 bg-black text-white rounded-full font-semibold hover:bg-[var(--color-accent)] transition-all cursor-pointer shadow-md"
+                >
+                  Send Another Message
+                </button>
               </motion.div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-12 flex-grow flex flex-col justify-between">
-                <div className="text-2xl md:text-4xl leading-[2] md:leading-[2.2] font-light text-gray-400">
+              <form onSubmit={handleSubmit} className="space-y-10 flex-grow flex flex-col justify-between">
+                {/* Honeypot Spam Protection (Hidden from legitimate users) */}
+                <input
+                  type="checkbox"
+                  name="botcheck"
+                  className="hidden"
+                  style={{ display: 'none' }}
+                  tabIndex={-1}
+                  autoComplete="off"
+                />
+
+                <div className="text-xl sm:text-2xl md:text-3xl lg:text-4xl leading-[2.2] md:leading-[2.4] font-light text-gray-400">
                   Hello! My name is{' '}
                   <input
                     type="text"
@@ -187,7 +244,10 @@ export default function Contact() {
                     onChange={handleChange}
                     required
                     placeholder="Your Name"
-                    className="bg-transparent border-b-2 border-gray-200 focus:border-[var(--color-accent)] text-black outline-none w-48 md:w-72 text-center placeholder-gray-200 transition-colors font-medium pb-1"
+                    style={{
+                      width: formData.name ? `${Math.max(formData.name.length + 1, 10)}ch` : '10ch',
+                    }}
+                    className="inline-block bg-transparent border-b-2 border-gray-300 focus:border-black text-black font-normal outline-none transition-all px-1 pb-0.5 mx-1 min-w-[120px] max-w-full placeholder:text-gray-300 placeholder:font-light"
                   />
                   {' '}and I'm looking for help with a project. You can reach me at{' '}
                   <input
@@ -197,7 +257,10 @@ export default function Contact() {
                     onChange={handleChange}
                     required
                     placeholder="Email Address"
-                    className="bg-transparent border-b-2 border-gray-200 focus:border-[var(--color-accent)] text-black outline-none w-full md:w-96 text-center placeholder-gray-200 transition-colors font-medium pb-1 mt-4 md:mt-0"
+                    style={{
+                      width: formData.email ? `${Math.max(formData.email.length + 1, 14)}ch` : '14ch',
+                    }}
+                    className="inline-block bg-transparent border-b-2 border-gray-300 focus:border-black text-black font-normal outline-none transition-all px-1 pb-0.5 mx-1 min-w-[180px] max-w-full placeholder:text-gray-300 placeholder:font-light"
                   />
                   . Here are some details about what I have in mind:{' '}
                   <textarea
@@ -206,21 +269,49 @@ export default function Contact() {
                     onChange={handleChange}
                     required
                     placeholder="Tell me about your vision..."
-                    className="bg-transparent border-b-2 border-gray-200 focus:border-[var(--color-accent)] text-black outline-none w-full mt-8 resize-none placeholder-gray-200 transition-colors font-medium align-bottom"
+                    className="block bg-transparent border-b-2 border-gray-300 focus:border-black text-black font-normal outline-none w-full mt-6 pb-2 resize-none placeholder:text-gray-300 placeholder:font-light transition-colors leading-relaxed"
                     rows={3}
                   ></textarea>
                 </div>
+
+                {errorMessage && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 flex items-start gap-3"
+                  >
+                    <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
+                    <div className="text-sm">
+                      <p className="font-semibold">{errorMessage}</p>
+                      <p className="mt-1 text-red-700/80">
+                        You can also email directly to{' '}
+                        <a href="mailto:varunpironiya@gmail.com" className="underline font-bold hover:text-red-950">
+                          varunpironiya@gmail.com
+                        </a>
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
                 
-                <div className="pt-8 flex justify-end mt-auto">
+                <div className="pt-6 flex justify-end mt-auto">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="submit"
                     disabled={isSubmitting}
-                    className="py-5 px-10 bg-black text-white rounded-full font-bold text-lg hover:bg-[var(--color-accent)] transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-4 group shadow-xl hover:shadow-2xl"
+                    className="py-5 px-10 bg-black text-white rounded-full font-bold text-lg hover:bg-[var(--color-accent)] transition-all disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-4 group shadow-xl hover:shadow-2xl cursor-pointer"
                   >
-                    {isSubmitting ? 'Sending...' : 'Send Inquiry'}
-                    {!isSubmitting && <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform" />}
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={24} className="animate-spin" />
+                        <span>Sending...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Send Inquiry</span>
+                        <ArrowRight size={24} className="group-hover:translate-x-2 transition-transform" />
+                      </>
+                    )}
                   </motion.button>
                 </div>
               </form>
